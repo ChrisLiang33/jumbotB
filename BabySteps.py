@@ -47,13 +47,6 @@ def safe_move(motor, motor_id, target_angle, move_time=50):
 
     motor.move(safe_angle, time=move_time)
 
-# --- BABY STEP PARAMETERS ---
-STEP_LEG_LIFT = 5     # degrees to lift a leg
-STEP_PITCH    = 4     # degrees to swing hip forward/back
-STEP_ROLL     = 3     # degrees to shift weight laterally
-PHASE_TIME    = 600   # ms per micro-movement
-PAUSE         = 0.4   # seconds to settle between phases
-
 # --- HOMING SEQUENCE ---
 print("Moving to home position safely...")
 home_time = 2000
@@ -72,97 +65,90 @@ safe_move(motor8, 8, 120, move_time=home_time)
 
 time.sleep(2.5)
 
-# --- BABY STEP LOOP ---
-# Each step cycle per leg:
-#   1. Shift weight onto stance leg (roll)
-#   2. Lift swing leg slightly
-#   3. Swing lifted leg forward (pitch)
-#   4. Place swing leg down
-#   5. Center weight back
-#   6. Settle (return pitch to neutral)
+# --- BABY STEP PARAMETERS ---
+STEP_LEG_LIFT = 5     # degrees to lift a leg
+STEP_PITCH    = 4     # degrees to swing hip forward/back
+STEP_ROLL     = 3     # degrees to shift weight laterally
+MOVE_TIME     = 500   # ms per micro-movement
+SETTLE        = 0.35  # seconds to settle between phases
 
-print("Starting baby steps (Ctrl+C to stop)...")
+# --- DYNAMIC LOOP ---
+print("Starting baby steps...")
 step_count = 0
 
 while True:
     try:
-        # ======= RIGHT LEG (leg 2) STEPS FORWARD =======
+        # ======= RIGHT LEG FORWARD =======
         step_count += 1
-        print(f"--- Step {step_count}: right leg forward ---")
+        print(f"Step {step_count}: right leg forward")
 
-        # Phase 1 - shift weight onto left leg
-        safe_move(motor4, 4, 120 - STEP_ROLL, move_time=PHASE_TIME)
-        safe_move(motor8, 8, 120 - STEP_ROLL, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
+        # Shift weight onto left leg
+        safe_move(motor4, 4, 120 - STEP_ROLL, move_time=MOVE_TIME)
+        safe_move(motor8, 8, 120 - STEP_ROLL, move_time=MOVE_TIME)
+        time.sleep(SETTLE)
 
-        # Phase 2 - lift right leg slightly
-        safe_move(motor5, 5, 135 - STEP_LEG_LIFT, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
+        # Lift right leg
+        safe_move(motor5, 5, 135 - STEP_LEG_LIFT, move_time=MOVE_TIME)
+        time.sleep(SETTLE)
 
-        # Phase 3 - swing right leg forward, left leg nudges back
-        safe_move(motor6, 6, 130 - STEP_PITCH, move_time=PHASE_TIME)
-        safe_move(motor2, 2, 130 + STEP_PITCH, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
+        # Swing right leg forward, left leg pushes back
+        safe_move(motor6, 6, 130 - STEP_PITCH, move_time=MOVE_TIME)
+        safe_move(motor2, 2, 130 + STEP_PITCH, move_time=MOVE_TIME)
+        time.sleep(SETTLE)
 
-        # Phase 4 - place right leg down
-        safe_move(motor5, 5, 135, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
+        # Place right leg down
+        safe_move(motor5, 5, 135, move_time=MOVE_TIME)
+        time.sleep(SETTLE)
 
-        # Phase 5 - center weight
-        safe_move(motor4, 4, 120, move_time=PHASE_TIME)
-        safe_move(motor8, 8, 120, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
+        # Center weight and return pitch to home
+        safe_move(motor4, 4, 120, move_time=MOVE_TIME)
+        safe_move(motor8, 8, 120, move_time=MOVE_TIME)
+        safe_move(motor6, 6, 130, move_time=MOVE_TIME)
+        safe_move(motor2, 2, 130, move_time=MOVE_TIME)
+        time.sleep(SETTLE)
 
-        # Phase 6 - settle pitch back to home
-        safe_move(motor6, 6, 130, move_time=PHASE_TIME)
-        safe_move(motor2, 2, 130, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
-
-        # ======= LEFT LEG (leg 1) STEPS FORWARD =======
+        # ======= LEFT LEG FORWARD =======
         step_count += 1
-        print(f"--- Step {step_count}: left leg forward ---")
+        print(f"Step {step_count}: left leg forward")
 
-        # Phase 1 - shift weight onto right leg
-        safe_move(motor4, 4, 120 + STEP_ROLL, move_time=PHASE_TIME)
-        safe_move(motor8, 8, 120 + STEP_ROLL, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
+        # Shift weight onto right leg
+        safe_move(motor4, 4, 120 + STEP_ROLL, move_time=MOVE_TIME)
+        safe_move(motor8, 8, 120 + STEP_ROLL, move_time=MOVE_TIME)
+        time.sleep(SETTLE)
 
-        # Phase 2 - lift left leg slightly
-        safe_move(motor1, 1, 135 - STEP_LEG_LIFT, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
+        # Lift left leg
+        safe_move(motor1, 1, 135 - STEP_LEG_LIFT, move_time=MOVE_TIME)
+        time.sleep(SETTLE)
 
-        # Phase 3 - swing left leg forward, right leg nudges back
-        safe_move(motor2, 2, 130 - STEP_PITCH, move_time=PHASE_TIME)
-        safe_move(motor6, 6, 130 + STEP_PITCH, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
+        # Swing left leg forward, right leg pushes back
+        safe_move(motor2, 2, 130 - STEP_PITCH, move_time=MOVE_TIME)
+        safe_move(motor6, 6, 130 + STEP_PITCH, move_time=MOVE_TIME)
+        time.sleep(SETTLE)
 
-        # Phase 4 - place left leg down
-        safe_move(motor1, 1, 135, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
+        # Place left leg down
+        safe_move(motor1, 1, 135, move_time=MOVE_TIME)
+        time.sleep(SETTLE)
 
-        # Phase 5 - center weight
-        safe_move(motor4, 4, 120, move_time=PHASE_TIME)
-        safe_move(motor8, 8, 120, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
-
-        # Phase 6 - settle pitch back to home
-        safe_move(motor2, 2, 130, move_time=PHASE_TIME)
-        safe_move(motor6, 6, 130, move_time=PHASE_TIME)
-        time.sleep(PAUSE)
+        # Center weight and return pitch to home
+        safe_move(motor4, 4, 120, move_time=MOVE_TIME)
+        safe_move(motor8, 8, 120, move_time=MOVE_TIME)
+        safe_move(motor2, 2, 130, move_time=MOVE_TIME)
+        safe_move(motor6, 6, 130, move_time=MOVE_TIME)
+        time.sleep(SETTLE)
 
     except KeyboardInterrupt:
-        print("\nStopping motors safely... returning to home position.")
+        print("\nStopping motors safely...")
         shutdown_time = 1000
 
-        # Home Leg 1
+        # Leg 1 Park
         safe_move(motor1, 1, 135, move_time=shutdown_time)
-        safe_move(motor2, 2, 130, move_time=shutdown_time)
+        safe_move(motor2, 2, 110, move_time=shutdown_time)
         safe_move(motor3, 3, 113, move_time=shutdown_time)
         safe_move(motor4, 4, 120, move_time=shutdown_time)
 
-        # Home Leg 2
+        # Leg 2 Park
         safe_move(motor5, 5, 135, move_time=shutdown_time)
-        safe_move(motor6, 6, 130, move_time=shutdown_time)
+        safe_move(motor6, 6, 110, move_time=shutdown_time)
         safe_move(motor7, 7, 113, move_time=shutdown_time)
         safe_move(motor8, 8, 120, move_time=shutdown_time)
 
