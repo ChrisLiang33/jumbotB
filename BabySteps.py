@@ -151,18 +151,18 @@ while True:
         time.sleep(PAUSE)
 
     except KeyboardInterrupt:
-        print("\nStopping motors safely...")
+        print("\nStopping motors safely... returning to home position.")
         shutdown_time = 1000
 
-        # Leg 1 Park
+        # Home Leg 1
         safe_move(motor1, 1, 135, move_time=shutdown_time)
-        safe_move(motor2, 2, 110, move_time=shutdown_time)
+        safe_move(motor2, 2, 130, move_time=shutdown_time)
         safe_move(motor3, 3, 113, move_time=shutdown_time)
         safe_move(motor4, 4, 120, move_time=shutdown_time)
 
-        # Leg 2 Park
+        # Home Leg 2
         safe_move(motor5, 5, 135, move_time=shutdown_time)
-        safe_move(motor6, 6, 110, move_time=shutdown_time)
+        safe_move(motor6, 6, 130, move_time=shutdown_time)
         safe_move(motor7, 7, 113, move_time=shutdown_time)
         safe_move(motor8, 8, 120, move_time=shutdown_time)
 
