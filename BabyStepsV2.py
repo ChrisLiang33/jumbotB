@@ -67,17 +67,20 @@ LIFT_AMOUNT     = 25     # knee bend during swing (was 12 - barely visible)
 LIFT_LEAD       = math.pi / 4   # lift peaks 45 deg BEFORE swing peak
 
 # --- hip pitch (asymmetric: push back harder than swing forward) ---
-STRIDE_FORWARD  = 18     # forward swing amplitude
-STRIDE_BACK     = 30     # backward push amplitude — much bigger for propulsion
+# Keep these small — big stride = big reaction torque on torso = tips backward
+# (the high-COM Pi on top makes the robot very sensitive to this torque)
+STRIDE_FORWARD  = 12     # forward swing amplitude
+STRIDE_BACK     = 18     # backward push amplitude — only slightly bigger than forward
 
 # --- stance extension (the "fake ankle push-off") ---
-# Without an ankle, this is the ONLY way to propel forward via the support leg.
+# Without an ankle, this is the main way to propel forward via the support leg.
 # When the support leg extends during the back-push phase, it lifts the hip
 # and rolls the body forward over the planted foot.
-STANCE_EXTEND   = 15     # was 5 — now does real work as a fake push-off
+# This does NOT cause backward tipping like a big STRIDE_BACK does.
+STANCE_EXTEND   = 15     # keeps real motion on the leg servo
 
 # --- forward bias on support leg ---
-SUPPORT_BIAS    = 5      # extra back-push on the support leg
+SUPPORT_BIAS    = 3      # gentle bias — too much and it tips backward
 
 # --- lateral sway (weight shift) ---
 SWAY_AMOUNT     = 6      # slightly more to ensure weight transfers to support leg
