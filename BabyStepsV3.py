@@ -46,10 +46,9 @@ HOME = {
     5: 115, 6: 195, 7: 120, 8: 115,
 }
 
-# Sign convention determined from hand-walked CapturePoses data:
-# motor 1 DECREASES  -> leg 1 forward in body frame
-# motor 6 INCREASES  -> leg 2 forward in body frame
-PITCH_FORWARD_SIGN = {1: -1, 6: +1}
+# motor 1 increases  -> leg 1 forward
+# motor 6 decreases  -> leg 2 forward (motor 6 is mounted mirrored)
+PITCH_FORWARD_SIGN = {1: +1, 6: -1}
 
 def safe_move(motor_obj, motor_id, target_angle, move_time=50):
     min_angle, max_angle = LIMITS[motor_id]
@@ -73,46 +72,31 @@ homing()
 # ============================================================
 # V3 GAIT KNOBS — all in BODY-FRAME degrees
 # ============================================================
-WALK_SPEED      = 2.5    # bumped from 1.2 -- shorter airborne time per leg
+WALK_SPEED      = 1.2
 
 # --- HIP PITCH RANGE (the measured safe envelope) ---
 # Each leg's body-frame angle stays within [PITCH_MIN, PITCH_MAX].
-# Note: PITCH_OFFSET below shifts the operating range, so widen these
-# soft limits to accommodate the shifted range.
-PITCH_MIN       = -25    # widened from -5 to allow PITCH_OFFSET shift
-PITCH_MAX       = +25
+PITCH_MIN       = -5     # back limit  (set by PitchRangeTest)
+PITCH_MAX       = +25    # forward limit (set by PitchRangeTest)
 
 # --- ASYMMETRY: where the leg sits during stance vs swing ---
-SWING_PITCH     = +18    # body-frame forward extreme
-STANCE_PITCH    = -5     # body-frame backward extreme
-
-# --- PITCH OFFSET (constant shift applied to BOTH legs every cycle) ---
-# Compensates for COM being too far forward (robot was face-planting).
-# Negative value shifts both legs further BACKWARD in body frame.
-# Effective swing range becomes [STANCE_PITCH + PITCH_OFFSET, SWING_PITCH + PITCH_OFFSET]
-# With current values: [-20, +3]
-PITCH_OFFSET    = -15
+# Within the safe envelope, you can bias the swing-vs-stance position.
+# Defaults below put each leg's full 30 deg of swing inside [-5, +25]:
+#   stance leg (planted, pushing back) = PITCH_MIN
+#   swing  leg (in the air, going forward) = PITCH_MAX
+# To bias more time forward: raise both. To bias backward: lower both.
+SWING_PITCH     = +25    # body-frame angle when the leg is at peak forward (in air)
+STANCE_PITCH    = -5     # body-frame angle when the leg is at peak backward (push-off)
 
 # --- foot lift (knee bend during swing — no ankle, so this is critical) ---
-# Hand-walked data showed leg 1 knee bending up to 60 deg from home.
-# Using 40 here as a comfortable cyclic equivalent.
-LIFT_AMOUNT     = 40
+LIFT_AMOUNT     = 25
 LIFT_LEAD       = math.pi / 4   # lift leads the swing peak by 45 deg
 
 # --- stance extension (the "fake ankle" — extends leg during stance) ---
-# Hand-walked data showed support knee locked at +30 from home.
-# This is the main forward-propulsion mechanism without an ankle.
-# Dropped from 25 -- combined with high speed it was too aggressive (face-plant)
-STANCE_EXTEND   = 18
+STANCE_EXTEND   = 12
 
 # --- lateral sway ---
 SWAY_AMOUNT     = 6
-
-# --- hip yaw oscillation ---
-# Hand-walked data showed both yaws swinging together with ~25 deg total range.
-# Synchronized (both legs same phase), oscillates with the gait.
-# Reduced from 10 -- diagonal swing was too big
-YAW_AMOUNT      = 5
 # ============================================================
 
 # Derived: center and amplitude in body frame
@@ -145,10 +129,9 @@ while True:
         # leg 1 oscillates between SWING_PITCH (when sin > 0, swinging forward)
         # and STANCE_PITCH (when sin < 0, pushing back).
         # leg 2 is mirrored half-cycle later.
-        # PITCH_OFFSET shifts both legs by a constant (used to bias COM).
         s = math.sin(phase)
-        leg1_pitch_bf = PITCH_CENTER + s * PITCH_AMP + PITCH_OFFSET
-        leg2_pitch_bf = PITCH_CENTER - s * PITCH_AMP + PITCH_OFFSET   # mirrored phase
+        leg1_pitch_bf = PITCH_CENTER + s * PITCH_AMP
+        leg2_pitch_bf = PITCH_CENTER - s * PITCH_AMP   # mirrored phase
 
         # Clamp to safety envelope (defensive — should already be inside)
         leg1_pitch_bf = max(PITCH_MIN, min(PITCH_MAX, leg1_pitch_bf))
@@ -157,9 +140,6 @@ while True:
         # --- SWAY ---
         sway_wave = math.cos(phase) * SWAY_AMOUNT
 
-        # --- YAW (both legs synchronized, in phase with the swing) ---
-        yaw_wave = math.sin(phase) * YAW_AMOUNT
-
         # --- CONVERT body-frame pitch to motor angles ---
         hip1_pitch_angle = HOME[1] + PITCH_FORWARD_SIGN[1] * leg1_pitch_bf
         hip2_pitch_angle = HOME[6] + PITCH_FORWARD_SIGN[6] * leg2_pitch_bf
@@ -167,9 +147,9 @@ while True:
         leg1_angle       = HOME[2] - lift_wave1 + stance_extend1
         leg2_angle       = HOME[5] - lift_wave2 + stance_extend2
 
-        hip1_yaw_angle   = HOME[3] + yaw_wave
+        hip1_yaw_angle   = HOME[3]
         hip1_roll_angle  = HOME[4] + sway_wave
-        hip2_yaw_angle   = HOME[7] + yaw_wave
+        hip2_yaw_angle   = HOME[7]
         hip2_roll_angle  = HOME[8] + sway_wave
 
         # Apply
