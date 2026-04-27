@@ -46,9 +46,10 @@ HOME = {
     5: 115, 6: 195, 7: 120, 8: 115,
 }
 
-# motor 1 increases  -> leg 1 forward
-# motor 6 decreases  -> leg 2 forward (motor 6 is mounted mirrored)
-PITCH_FORWARD_SIGN = {1: +1, 6: -1}
+# Sign convention determined from hand-walked CapturePoses data:
+# motor 1 DECREASES  -> leg 1 forward in body frame
+# motor 6 INCREASES  -> leg 2 forward in body frame
+PITCH_FORWARD_SIGN = {1: -1, 6: +1}
 
 def safe_move(motor_obj, motor_id, target_angle, move_time=50):
     min_angle, max_angle = LIMITS[motor_id]
@@ -89,14 +90,23 @@ SWING_PITCH     = +25    # body-frame angle when the leg is at peak forward (in 
 STANCE_PITCH    = -5     # body-frame angle when the leg is at peak backward (push-off)
 
 # --- foot lift (knee bend during swing — no ankle, so this is critical) ---
-LIFT_AMOUNT     = 25
+# Hand-walked data showed leg 1 knee bending up to 60 deg from home.
+# Using 40 here as a comfortable cyclic equivalent.
+LIFT_AMOUNT     = 40
 LIFT_LEAD       = math.pi / 4   # lift leads the swing peak by 45 deg
 
 # --- stance extension (the "fake ankle" — extends leg during stance) ---
-STANCE_EXTEND   = 12
+# Hand-walked data showed support knee locked at +30 from home.
+# This is the main forward-propulsion mechanism without an ankle.
+STANCE_EXTEND   = 25
 
 # --- lateral sway ---
 SWAY_AMOUNT     = 6
+
+# --- hip yaw oscillation ---
+# Hand-walked data showed both yaws swinging together with ~25 deg total range.
+# Synchronized (both legs same phase), oscillates with the gait.
+YAW_AMOUNT      = 10
 # ============================================================
 
 # Derived: center and amplitude in body frame
@@ -140,6 +150,9 @@ while True:
         # --- SWAY ---
         sway_wave = math.cos(phase) * SWAY_AMOUNT
 
+        # --- YAW (both legs synchronized, in phase with the swing) ---
+        yaw_wave = math.sin(phase) * YAW_AMOUNT
+
         # --- CONVERT body-frame pitch to motor angles ---
         hip1_pitch_angle = HOME[1] + PITCH_FORWARD_SIGN[1] * leg1_pitch_bf
         hip2_pitch_angle = HOME[6] + PITCH_FORWARD_SIGN[6] * leg2_pitch_bf
@@ -147,9 +160,9 @@ while True:
         leg1_angle       = HOME[2] - lift_wave1 + stance_extend1
         leg2_angle       = HOME[5] - lift_wave2 + stance_extend2
 
-        hip1_yaw_angle   = HOME[3]
+        hip1_yaw_angle   = HOME[3] + yaw_wave
         hip1_roll_angle  = HOME[4] + sway_wave
-        hip2_yaw_angle   = HOME[7]
+        hip2_yaw_angle   = HOME[7] + yaw_wave
         hip2_roll_angle  = HOME[8] + sway_wave
 
         # Apply
