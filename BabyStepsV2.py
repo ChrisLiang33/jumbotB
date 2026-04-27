@@ -69,18 +69,22 @@ LIFT_LEAD       = math.pi / 4   # lift peaks 45 deg BEFORE swing peak
 # --- hip pitch (asymmetric: push back harder than swing forward) ---
 # Keep these small — big stride = big reaction torque on torso = tips backward
 # (the high-COM Pi on top makes the robot very sensitive to this torque)
-STRIDE_FORWARD  = 12     # forward swing amplitude
-STRIDE_BACK     = 18     # backward push amplitude — only slightly bigger than forward
+STRIDE_FORWARD  = 10     # forward swing amplitude
+STRIDE_BACK     = 14     # backward push amplitude
+
+# --- TORSO LEAN (constant forward bias) ---
+# Without this, the gait creates net backward torque on the torso each cycle.
+# This rotates BOTH legs backward in body frame, equivalent to leaning the
+# torso FORWARD over the feet. Combats persistent backward fall.
+TORSO_LEAN      = 8      # degrees of constant forward lean (try 5-12)
 
 # --- stance extension (the "fake ankle push-off") ---
-# Without an ankle, this is the main way to propel forward via the support leg.
-# When the support leg extends during the back-push phase, it lifts the hip
-# and rolls the body forward over the planted foot.
-# This does NOT cause backward tipping like a big STRIDE_BACK does.
-STANCE_EXTEND   = 15     # keeps real motion on the leg servo
+# Without an ankle, the support leg extending lifts hip up over planted foot.
+# Too much can kick the foot backward via friction reaction — keep moderate.
+STANCE_EXTEND   = 10     # reduced from 15
 
 # --- forward bias on support leg ---
-SUPPORT_BIAS    = 3      # gentle bias — too much and it tips backward
+SUPPORT_BIAS    = 2      # subtle — TORSO_LEAN does most of the work now
 
 # --- lateral sway (weight shift) ---
 SWAY_AMOUNT     = 6      # slightly more to ensure weight transfers to support leg
