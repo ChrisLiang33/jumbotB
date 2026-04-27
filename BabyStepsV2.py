@@ -66,22 +66,24 @@ WALK_SPEED      = 1.2    # slower so leg servo can track under load
 LIFT_AMOUNT     = 25     # knee bend during swing (was 12 - barely visible)
 LIFT_LEAD       = math.pi / 4   # lift peaks 45 deg BEFORE swing peak
 
-# --- hip pitch (asymmetric: push back harder than swing forward) ---
-# Keep these small — big stride = big reaction torque on torso = tips backward
-# (the high-COM Pi on top makes the robot very sensitive to this torque)
-STRIDE_FORWARD  = 10     # forward swing amplitude
-STRIDE_BACK     = 14     # backward push amplitude
+# --- hip pitch (heavily biased toward back, almost no forward kick) ---
+# The robot was kicking its leg up forward too much. Range should mostly
+# be on the BACK side of neutral. Forward swing is just enough to clear
+# foot to its next plant location.
+STRIDE_FORWARD  = 5      # tiny forward swing — no more "kicking to the sky"
+STRIDE_BACK     = 18     # bigger back push — most of the range is here
 
-# --- TORSO LEAN (constant forward bias) ---
-# Without this, the gait creates net backward torque on the torso each cycle.
-# This rotates BOTH legs backward in body frame, equivalent to leaning the
-# torso FORWARD over the feet. Combats persistent backward fall.
-TORSO_LEAN      = 8      # degrees of constant forward lean (try 5-12)
+# --- TORSO LEAN (shifts entire pitch range further backward) ---
+# A positive value rotates both legs backward in body frame.
+# Equivalent to leaning the torso forward over the feet.
+# Effective leg pitch range becomes: [-(STRIDE_BACK + TORSO_LEAN), +(STRIDE_FORWARD - TORSO_LEAN)]
+# With current values: [-32, -7] -- legs always behind neutral. Good!
+TORSO_LEAN      = 14     # shift the whole pitch range backward
 
 # --- stance extension (the "fake ankle push-off") ---
-# Without an ankle, the support leg extending lifts hip up over planted foot.
-# Too much can kick the foot backward via friction reaction — keep moderate.
-STANCE_EXTEND   = 10     # reduced from 15
+# With the pitch range shifted way back, this carries even more of the
+# forward propulsion. Keep moderate to avoid foot slipping backward.
+STANCE_EXTEND   = 12
 
 # --- forward bias on support leg ---
 SUPPORT_BIAS    = 2      # subtle — TORSO_LEAN does most of the work now
@@ -133,12 +135,15 @@ while True:
         sway_wave = math.cos(phase) * SWAY_AMOUNT
 
         # === APPLY ===
-        hip1_pitch_angle = 40  + pitch_wave + pitch_bias1
+        # TORSO_LEAN: subtract from leg 1 motor (smaller angle = leg back in body frame),
+        #             add to leg 2 motor (larger angle = leg back in body frame, since mirrored).
+        # Both legs rotate backward in body frame -> torso effectively leans forward.
+        hip1_pitch_angle = 40  + pitch_wave + pitch_bias1 - TORSO_LEAN
         leg1_angle       = 120 - lift_wave1 + stance_extend1
         hip1_yaw_angle   = 115
         hip1_roll_angle  = 120 + sway_wave
 
-        hip2_pitch_angle = 195 + pitch_wave + pitch_bias2
+        hip2_pitch_angle = 195 + pitch_wave + pitch_bias2 + TORSO_LEAN
         leg2_angle       = 115 - lift_wave2 + stance_extend2
         hip2_yaw_angle   = 120
         hip2_roll_angle  = 115 + sway_wave
