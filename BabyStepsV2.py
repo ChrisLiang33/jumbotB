@@ -58,29 +58,29 @@ homing()
 # ============================================================
 # V2 GAIT TUNING KNOBS  --  edit these and re-run
 # ============================================================
-WALK_SPEED      = 1.5    # cycle rate (V1 was 3.0). slower = less dynamic kickback.
+WALK_SPEED      = 1.2    # slower so leg servo can track under load
 
-# --- foot lift ---
-LIFT_AMOUNT     = 12     # how much the knee bends to lift the foot (V1 was 30).
-                         # smaller = less squat + less foot tilt (no ankle joint!)
-LIFT_LEAD       = math.pi / 4   # lift peaks BEFORE swing peak (45 deg early).
-                                # this lets the foot rise before it swings forward.
+# --- foot lift (knee bends to lift foot) ---
+# With NO ankle joint, the knee is the only way to clear the foot.
+# Needs to be big enough to actually lift foot off the floor.
+LIFT_AMOUNT     = 25     # knee bend during swing (was 12 - barely visible)
+LIFT_LEAD       = math.pi / 4   # lift peaks 45 deg BEFORE swing peak
 
 # --- hip pitch (asymmetric: push back harder than swing forward) ---
-STRIDE_FORWARD  = 15     # forward swing amplitude (swing leg through air)
-STRIDE_BACK     = 22     # backward push amplitude (stance leg propelling body)
-                         # STRIDE_BACK > STRIDE_FORWARD biases body forward each cycle.
+STRIDE_FORWARD  = 18     # forward swing amplitude
+STRIDE_BACK     = 30     # backward push amplitude — much bigger for propulsion
 
-# --- stance extension (counter the squat) ---
-STANCE_EXTEND   = 5      # extra leg extension on the support leg.
-                         # keeps body height steady during single-leg stance.
+# --- stance extension (the "fake ankle push-off") ---
+# Without an ankle, this is the ONLY way to propel forward via the support leg.
+# When the support leg extends during the back-push phase, it lifts the hip
+# and rolls the body forward over the planted foot.
+STANCE_EXTEND   = 15     # was 5 — now does real work as a fake push-off
 
-# --- forward bias on support leg (counter backward tip) ---
-SUPPORT_BIAS    = 3      # extra back-push degrees on whichever leg is the support.
-                         # actively pushes torso forward each step.
+# --- forward bias on support leg ---
+SUPPORT_BIAS    = 5      # extra back-push on the support leg
 
-# --- lateral sway ---
-SWAY_AMOUNT     = 5      # weight shift side to side
+# --- lateral sway (weight shift) ---
+SWAY_AMOUNT     = 6      # slightly more to ensure weight transfers to support leg
 # ============================================================
 
 print("Starting baby steps V2 (Ctrl+C to stop)...")
