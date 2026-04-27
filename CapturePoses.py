@@ -1,17 +1,14 @@
 """
-Capture motor positions while you physically pose the robot by hand.
+Capture arbitrarily many poses while you physically pose the robot by hand.
 
 Workflow:
-  1. Run the script. It DISABLES torque on all 8 servos so you can move them.
-  2. Hold the robot in pose 1 (standing) and press Enter -> captures all 8 angles.
-  3. Hold pose 2 (one leg in air, swinging forward) -> Enter -> captures.
-  4. Hold pose 3 (one foot in front, one foot back) -> Enter -> captures.
-  5. Script prints all three captures in formats you can paste into a gait.
-  6. Saves to poses.json.
-  7. Asks if you want to re-enable torque (locks robot in current pose).
-
-Tip for poses 2 and 3: rest one foot on the ground and lift / move the other.
-Hold the robot's torso steady while pressing Enter.
+  1. Run script. Torque is DISABLED on all servos -- SUPPORT the robot.
+  2. Pose the robot. Press Enter to capture (auto-labeled step_1, step_2, ...).
+     OR type a custom label (like "heel_strike_left") then Enter.
+  3. Repeat as many times as you want.
+  4. Type 'q' or 'done' to finish.
+  5. Script prints a summary table, plots joint angles across the sequence,
+     and saves to poses.json + poses_plot.png.
 """
 
 from pylx16a.lx16a import *
@@ -27,38 +24,33 @@ def connect_servo(id):
         print(f"Servo {id} is not responding. Exiting.")
         exit()
 
-# Connect all 8 servos
 servos = {
-    1: connect_servo(1),  # Hip Pitch 1
-    2: connect_servo(2),  # Leg 1
-    3: connect_servo(3),  # Hip Yaw 1
-    4: connect_servo(4),  # Hip Roll 1
-    5: connect_servo(5),  # Leg 2
-    6: connect_servo(6),  # Hip Pitch 2
-    7: connect_servo(7),  # Hip Yaw 2
-    8: connect_servo(8),  # Hip Roll 2
+    1: connect_servo(1),
+    2: connect_servo(2),
+    3: connect_servo(3),
+    4: connect_servo(4),
+    5: connect_servo(5),
+    6: connect_servo(6),
+    7: connect_servo(7),
+    8: connect_servo(8),
 }
 
 NAMES = {
-    1: "hip_pitch1",
-    2: "leg1",
-    3: "hip_yaw1",
-    4: "hip_roll1",
-    5: "leg2",
-    6: "hip_pitch2",
-    7: "hip_yaw2",
-    8: "hip_roll2",
+    1: "hip_pitch1", 2: "leg1", 3: "hip_yaw1", 4: "hip_roll1",
+    5: "leg2",       6: "hip_pitch2", 7: "hip_yaw2", 8: "hip_roll2",
 }
 
-POSES_TO_CAPTURE = [
-    ("standing",        "Standing upright, both feet flat. Like the home pose."),
-    ("swing_forward",   "One leg in the air, that leg swung FORWARD. Other leg planted."),
-    ("mid_stride",      "One foot ahead of the body, the other foot behind. Mid-stride pose."),
+# Group joints into matched pairs (leg 1, leg 2) for plotting comparisons
+JOINT_PAIRS = [
+    ("Hip Pitch", 1, 6),
+    ("Leg / Knee", 2, 5),
+    ("Hip Yaw",   3, 7),
+    ("Hip Roll",  4, 8),
 ]
 
 
 def disable_all():
-    print("Disabling torque on all motors. Robot will go limp — SUPPORT IT.")
+    print("Disabling torque on all motors. Robot will go limp -- SUPPORT IT.")
     for sid, servo in servos.items():
         try:
             servo.disable_torque()
@@ -76,10 +68,9 @@ def enable_all():
     time.sleep(0.3)
 
 def read_pose():
-    """Read all 8 motor positions. Retries timeouts."""
     pose = {}
     for sid, servo in servos.items():
-        for attempt in range(3):
+        for _ in range(3):
             try:
                 pose[sid] = float(servo.get_physical_angle())
                 break
@@ -87,85 +78,129 @@ def read_pose():
                 time.sleep(0.05)
         else:
             pose[sid] = None
-            print(f"  motor {sid}: failed to read (timeout)")
+            print(f"  motor {sid}: read failed")
     return pose
-
-def print_pose(label, pose):
-    print(f"\n--- {label} ---")
-    for sid in sorted(pose.keys()):
-        val = pose[sid]
-        if val is None:
-            print(f"  {sid} {NAMES[sid]:<12} : <read failed>")
-        else:
-            print(f"  {sid} {NAMES[sid]:<12} : {val:6.1f} deg")
 
 
 # -------------------- main --------------------
 print("=" * 70)
-print("  CAPTURE POSES — pose the robot by hand, press Enter to capture.")
+print("  CAPTURE POSES")
+print("  Press Enter to capture, type label+Enter to name, type 'q' to finish.")
 print("=" * 70)
 print()
 
 disable_all()
 
-captured = {}
+captures = []   # list of (label, pose_dict)
+step_idx = 0
 
-for label, instruction in POSES_TO_CAPTURE:
-    print()
-    print(f">>> POSE: {label}")
-    print(f"    {instruction}")
-    input(f"    Hold the robot still and press Enter to capture {label}... ")
+while True:
+    step_idx += 1
+    default_label = f"step_{step_idx}"
+    prompt = f"Capture #{step_idx} (Enter for '{default_label}', or type a label, or 'q' to finish): "
+    raw = input(prompt).strip()
+    if raw.lower() in ("q", "done", "quit", "exit"):
+        step_idx -= 1   # undo increment since we didn't capture
+        break
+    label = raw if raw else default_label
     pose = read_pose()
-    captured[label] = pose
-    print_pose(label, pose)
+    captures.append((label, pose))
+    # Quick echo
+    nice = ", ".join(f"{NAMES[sid]}={pose[sid]:.1f}" if pose[sid] is not None else f"{NAMES[sid]}=??"
+                     for sid in sorted(pose.keys()))
+    print(f"  captured '{label}': {nice}")
 
-# Print summary in a couple of formats
+if not captures:
+    print("No captures. Exiting.")
+    exit()
+
+print(f"\nTotal captures: {len(captures)}")
+
+# -------------------- summary table --------------------
 print()
-print("=" * 70)
-print("  SUMMARY")
-print("=" * 70)
+print("=" * 90)
+print("  SUMMARY TABLE  (motor angles in degrees)")
+print("=" * 90)
 
-print("\n# All captured poses (motor_id -> angle, degrees):\n")
-for label, pose in captured.items():
-    print(f"{label} = {{")
-    for sid in sorted(pose.keys()):
-        val = pose[sid]
-        if val is None:
-            print(f"    {sid}: None,    # {NAMES[sid]} — read failed")
-        else:
-            print(f"    {sid}: {val:6.1f},  # {NAMES[sid]}")
-    print("}")
-    print()
+# Column widths
+label_w = max(len(lbl) for lbl, _ in captures)
+label_w = max(label_w, 8)
 
-# Side-by-side delta table — useful to see what changed between poses
-print("\n# Side-by-side comparison (relative to 'standing'):\n")
-print(f"{'motor':<14} {'standing':>10} {'swing_fwd':>10} {'mid_stride':>11} {'sw-st':>8} {'mid-st':>8}")
-print("-" * 70)
-standing = captured.get("standing", {})
-swing    = captured.get("swing_forward", {})
-mid      = captured.get("mid_stride", {})
+header = f"{'motor':<14}"
+for lbl, _ in captures:
+    header += f" {lbl:>{label_w}}"
+print(header)
+print("-" * len(header))
 for sid in sorted(servos.keys()):
-    st = standing.get(sid)
-    sw = swing.get(sid)
-    md = mid.get(sid)
-    st_s = f"{st:6.1f}" if st is not None else "  ---"
-    sw_s = f"{sw:6.1f}" if sw is not None else "  ---"
-    md_s = f"{md:6.1f}" if md is not None else "  ---"
-    sw_d = f"{sw - st:+6.1f}" if (st is not None and sw is not None) else "  ---"
-    md_d = f"{md - st:+6.1f}" if (st is not None and md is not None) else "  ---"
-    print(f"{sid} {NAMES[sid]:<11} {st_s:>10} {sw_s:>10} {md_s:>11} {sw_d:>8} {md_d:>8}")
+    row = f"{sid} {NAMES[sid]:<11}"
+    for _, pose in captures:
+        v = pose.get(sid)
+        row += f" {('---' if v is None else f'{v:.1f}'):>{label_w}}"
+    print(row)
 
-# Save JSON
-out_path = "poses.json"
-with open(out_path, "w") as f:
-    json.dump(captured, f, indent=2)
-print(f"\nSaved to {out_path}")
+# -------------------- delta table (each step relative to step 1) --------------------
+print()
+print("  DELTAS  (each step relative to capture 1)")
+print("-" * len(header))
+base = captures[0][1]
+for sid in sorted(servos.keys()):
+    row = f"{sid} {NAMES[sid]:<11}"
+    for lbl, pose in captures:
+        v = pose.get(sid)
+        b = base.get(sid)
+        if v is None or b is None:
+            row += f" {'---':>{label_w}}"
+        else:
+            row += f" {f'{v-b:+.1f}':>{label_w}}"
+    print(row)
 
-# Re-enable torque?
+# -------------------- save JSON --------------------
+out_json = "poses.json"
+with open(out_json, "w") as f:
+    json.dump(
+        [{"label": lbl, "angles": pose} for lbl, pose in captures],
+        f, indent=2
+    )
+print(f"\nSaved JSON: {out_json}")
+
+# -------------------- plot --------------------
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    print("matplotlib not installed -- skipping plot. (pip install matplotlib)")
+else:
+    labels = [lbl for lbl, _ in captures]
+    x = list(range(1, len(captures) + 1))
+
+    fig, axes = plt.subplots(2, 2, figsize=(13, 8), sharex=True)
+    fig.suptitle("Joint angles across captured poses (paired by joint type)")
+
+    for ax, (joint_name, sid_a, sid_b) in zip(axes.flat, JOINT_PAIRS):
+        ya = [c[1].get(sid_a) for c in captures]
+        yb = [c[1].get(sid_b) for c in captures]
+        ax.plot(x, ya, "-o", label=NAMES[sid_a])
+        ax.plot(x, yb, "-o", label=NAMES[sid_b])
+        ax.set_title(joint_name)
+        ax.set_ylabel("angle (deg)")
+        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=8)
+
+    for ax in axes[-1, :]:
+        ax.set_xlabel("capture #")
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, rotation=30, ha="right", fontsize=8)
+
+    plt.tight_layout()
+    out_png = "poses_plot.png"
+    plt.savefig(out_png, dpi=150)
+    print(f"Saved plot: {out_png}")
+    plt.show()
+
+# -------------------- re-enable torque? --------------------
 print()
 ans = input("Re-enable torque to lock the robot in its current pose? (y/n) ").strip().lower()
 if ans == "y":
     enable_all()
-    print("Torque enabled. Robot is holding its current pose.")
+    print("Torque enabled.")
 else:
-    print("Leaving torque disabled. Robot will stay limp — support it before letting go.")
+    print("Torque left disabled. Support the robot before letting go.")
