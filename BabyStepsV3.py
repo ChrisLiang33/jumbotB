@@ -77,17 +77,21 @@ WALK_SPEED      = 2.5    # bumped from 1.2 -- shorter airborne time per leg
 
 # --- HIP PITCH RANGE (the measured safe envelope) ---
 # Each leg's body-frame angle stays within [PITCH_MIN, PITCH_MAX].
-PITCH_MIN       = -5     # back limit  (set by PitchRangeTest)
-PITCH_MAX       = +25    # forward limit (set by PitchRangeTest)
+# Note: PITCH_OFFSET below shifts the operating range, so widen these
+# soft limits to accommodate the shifted range.
+PITCH_MIN       = -25    # widened from -5 to allow PITCH_OFFSET shift
+PITCH_MAX       = +25
 
 # --- ASYMMETRY: where the leg sits during stance vs swing ---
-# Within the safe envelope, you can bias the swing-vs-stance position.
-# Defaults below put each leg's full 30 deg of swing inside [-5, +25]:
-#   stance leg (planted, pushing back) = PITCH_MIN
-#   swing  leg (in the air, going forward) = PITCH_MAX
-# To bias more time forward: raise both. To bias backward: lower both.
-SWING_PITCH     = +18    # body-frame forward extreme (was +25 -- robot was face-planting)
-STANCE_PITCH    = -5     # body-frame angle when the leg is at peak backward (push-off)
+SWING_PITCH     = +18    # body-frame forward extreme
+STANCE_PITCH    = -5     # body-frame backward extreme
+
+# --- PITCH OFFSET (constant shift applied to BOTH legs every cycle) ---
+# Compensates for COM being too far forward (robot was face-planting).
+# Negative value shifts both legs further BACKWARD in body frame.
+# Effective swing range becomes [STANCE_PITCH + PITCH_OFFSET, SWING_PITCH + PITCH_OFFSET]
+# With current values: [-20, +3]
+PITCH_OFFSET    = -15
 
 # --- foot lift (knee bend during swing — no ankle, so this is critical) ---
 # Hand-walked data showed leg 1 knee bending up to 60 deg from home.
@@ -141,9 +145,10 @@ while True:
         # leg 1 oscillates between SWING_PITCH (when sin > 0, swinging forward)
         # and STANCE_PITCH (when sin < 0, pushing back).
         # leg 2 is mirrored half-cycle later.
+        # PITCH_OFFSET shifts both legs by a constant (used to bias COM).
         s = math.sin(phase)
-        leg1_pitch_bf = PITCH_CENTER + s * PITCH_AMP
-        leg2_pitch_bf = PITCH_CENTER - s * PITCH_AMP   # mirrored phase
+        leg1_pitch_bf = PITCH_CENTER + s * PITCH_AMP + PITCH_OFFSET
+        leg2_pitch_bf = PITCH_CENTER - s * PITCH_AMP + PITCH_OFFSET   # mirrored phase
 
         # Clamp to safety envelope (defensive — should already be inside)
         leg1_pitch_bf = max(PITCH_MIN, min(PITCH_MAX, leg1_pitch_bf))
