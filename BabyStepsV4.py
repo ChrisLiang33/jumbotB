@@ -1,14 +1,13 @@
 """
-BabyStepsV3 — gait built around the measured safe pitch range.
+BabyStepsV4 — small fast steps to minimize single-leg airborne time.
 
-From PitchRangeTest the safe body-frame pitch range for each leg is:
-    PITCH_MIN = -5 deg  (backward)
-    PITCH_MAX = +25 deg (forward)
-    Center    = +10 deg (the body wants to lean forward 10 deg)
-    Amplitude = +/- 15 deg around center
+Philosophy: instead of bigger strides (which give the body time to tip over
+during single-leg support), take tiny rapid shuffles. Each leg is in the
+air for as little time as possible. The robot stays close to double-support
+most of the cycle.
 
-The gait commands hip pitch in BODY-FRAME degrees and converts to motor
-angles using the mirroring convention (motor 1 forward = +, motor 6 forward = -).
+All other geometry (sign convention, body-frame envelope, lift-leads-swing)
+is inherited from V3.
 """
 
 from pylx16a.lx16a import *
@@ -71,55 +70,47 @@ print("Moving to home position safely...")
 homing()
 
 # ============================================================
-# V3 GAIT KNOBS — all in BODY-FRAME degrees
+# V4 GAIT KNOBS  --  small + fast philosophy
 # ============================================================
-WALK_SPEED      = 2.5    # bumped from 1.2 -- shorter airborne time per leg
+WALK_SPEED      = 4.5    # ~1.4s per full cycle, ~0.7s per leg in air
+                         # (V3 was 2.5 -> ~1.25s air time. V4 ~halves that.)
 
-# --- HIP PITCH RANGE (the measured safe envelope) ---
-# Each leg's body-frame angle stays within [PITCH_MIN, PITCH_MAX].
-PITCH_MIN       = -5     # back limit  (set by PitchRangeTest)
-PITCH_MAX       = +25    # forward limit (set by PitchRangeTest)
+# --- HIP PITCH (small swing range) ---
+PITCH_MIN       = -3     # tiny back push
+PITCH_MAX       = +12    # tiny forward swing
 
-# --- ASYMMETRY: where the leg sits during stance vs swing ---
-# Within the safe envelope, you can bias the swing-vs-stance position.
-# Defaults below put each leg's full 30 deg of swing inside [-5, +25]:
-#   stance leg (planted, pushing back) = PITCH_MIN
-#   swing  leg (in the air, going forward) = PITCH_MAX
-# To bias more time forward: raise both. To bias backward: lower both.
-SWING_PITCH     = +18    # body-frame forward extreme (was +25 -- robot was face-planting)
-STANCE_PITCH    = -5     # body-frame angle when the leg is at peak backward (push-off)
+# Where the leg sits at the extremes of its motion:
+SWING_PITCH     = +12    # forward extreme
+STANCE_PITCH    = -3     # backward extreme
 
-# --- foot lift (knee bend during swing — no ankle, so this is critical) ---
-# Hand-walked data showed leg 1 knee bending up to 60 deg from home.
-# Using 40 here as a comfortable cyclic equivalent.
-LIFT_AMOUNT     = 40
-LIFT_LEAD       = math.pi / 4   # lift leads the swing peak by 45 deg
+# --- foot lift (small knee bend, just enough to clear) ---
+LIFT_AMOUNT     = 15     # was 40 in V3 -- huge bend isn't needed for tiny steps
+LIFT_LEAD       = math.pi / 4   # lift leads swing peak by 45 deg
 
-# --- stance extension (the "fake ankle" — extends leg during stance) ---
-# Hand-walked data showed support knee locked at +30 from home.
-# This is the main forward-propulsion mechanism without an ankle.
-# Dropped from 25 -- combined with high speed it was too aggressive (face-plant)
-STANCE_EXTEND   = 18
+# --- stance extension (gentle push-off, dialed back since steps are smaller) ---
+STANCE_EXTEND   = 10
 
 # --- lateral sway ---
-SWAY_AMOUNT     = 6
+SWAY_AMOUNT     = 4      # small, since steps are quick
 
 # --- hip yaw oscillation ---
-# Hand-walked data showed both yaws swinging together with ~25 deg total range.
-# Synchronized (both legs same phase), oscillates with the gait.
-# Reduced from 10 -- diagonal swing was too big
-YAW_AMOUNT      = 5
+YAW_AMOUNT      = 3      # small yaw nudge
+
+# --- servo move time ---
+MOVE_TIME       = 50     # was 100 in V3 -- snappier tracking for fast cycle
 # ============================================================
 
 # Derived: center and amplitude in body frame
-PITCH_CENTER = (SWING_PITCH + STANCE_PITCH) / 2.0   # 10 with defaults
-PITCH_AMP    = (SWING_PITCH - STANCE_PITCH) / 2.0   # 15 with defaults
+PITCH_CENTER = (SWING_PITCH + STANCE_PITCH) / 2.0   # 4.5 with defaults
+PITCH_AMP    = (SWING_PITCH - STANCE_PITCH) / 2.0   # 7.5 with defaults
 
 print(f"Body-frame pitch envelope: [{PITCH_MIN}, {PITCH_MAX}]")
 print(f"Gait center: {PITCH_CENTER:+.1f} deg, amplitude: ±{PITCH_AMP:.1f} deg")
-print(f"Each leg will swing in body frame from {PITCH_CENTER - PITCH_AMP:+.1f} to {PITCH_CENTER + PITCH_AMP:+.1f}")
+print(f"Cycle period: {2 * math.pi / WALK_SPEED:.2f}s")
+print(f"Single-leg airborne time per cycle: ~{math.pi / WALK_SPEED:.2f}s")
+print()
 
-print("Starting baby steps V3 (Ctrl+C to stop)...")
+print("Starting baby steps V4 (small + fast). Ctrl+C to stop...")
 start_time = time.time()
 
 while True:
@@ -138,14 +129,11 @@ while True:
         stance_extend2 = max(0, lift_signal1) * STANCE_EXTEND
 
         # --- HIP PITCH in BODY-FRAME degrees ---
-        # leg 1 oscillates between SWING_PITCH (when sin > 0, swinging forward)
-        # and STANCE_PITCH (when sin < 0, pushing back).
-        # leg 2 is mirrored half-cycle later.
         s = math.sin(phase)
         leg1_pitch_bf = PITCH_CENTER + s * PITCH_AMP
-        leg2_pitch_bf = PITCH_CENTER - s * PITCH_AMP   # mirrored phase
+        leg2_pitch_bf = PITCH_CENTER - s * PITCH_AMP   # mirrored
 
-        # Clamp to safety envelope (defensive — should already be inside)
+        # safety clamp to user-tested envelope
         leg1_pitch_bf = max(PITCH_MIN, min(PITCH_MAX, leg1_pitch_bf))
         leg2_pitch_bf = max(PITCH_MIN, min(PITCH_MAX, leg2_pitch_bf))
 
@@ -168,15 +156,15 @@ while True:
         hip2_roll_angle  = HOME[8] + sway_wave
 
         # Apply
-        safe_move(hip_pitch1, 1, hip1_pitch_angle, move_time=100)
-        safe_move(leg1,       2, leg1_angle,       move_time=100)
-        safe_move(hip_yaw1,   3, hip1_yaw_angle,   move_time=50)
-        safe_move(hip_roll1,  4, hip1_roll_angle,  move_time=50)
+        safe_move(hip_pitch1, 1, hip1_pitch_angle, move_time=MOVE_TIME)
+        safe_move(leg1,       2, leg1_angle,       move_time=MOVE_TIME)
+        safe_move(hip_yaw1,   3, hip1_yaw_angle,   move_time=MOVE_TIME)
+        safe_move(hip_roll1,  4, hip1_roll_angle,  move_time=MOVE_TIME)
 
-        safe_move(leg2,       5, leg2_angle,       move_time=100)
-        safe_move(hip_pitch2, 6, hip2_pitch_angle, move_time=100)
-        safe_move(hip_yaw2,   7, hip2_yaw_angle,   move_time=50)
-        safe_move(hip_roll2,  8, hip2_roll_angle,  move_time=50)
+        safe_move(leg2,       5, leg2_angle,       move_time=MOVE_TIME)
+        safe_move(hip_pitch2, 6, hip2_pitch_angle, move_time=MOVE_TIME)
+        safe_move(hip_yaw2,   7, hip2_yaw_angle,   move_time=MOVE_TIME)
+        safe_move(hip_roll2,  8, hip2_roll_angle,  move_time=MOVE_TIME)
 
         time.sleep(0.02)
 
